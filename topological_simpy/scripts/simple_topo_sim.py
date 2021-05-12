@@ -33,13 +33,13 @@ seed(RANDOM_SEED)
 numpy.random.seed(RANDOM_SEED)
 
 if __name__ == "__main__":
-    config_file = '../config/picking_sim_combined.yaml'
+    config_file = '../config/picking_sim.yaml'
     # get the config params
     config_params = topological_simpy.config_utils_sim.get_mimic_des_params(config_file)
 
     env = simpy.RealtimeEnvironment(factor=SIM_RT_FACTOR, strict=False)
     # env = simpy.Environment()
-    tmap_config_file = '../maps/tmap.yaml'
+    tmap_config_file = '../maps/riseholme.tmap2'
 
     picker_ids = config_params["picker_ids"]
     robot_ids = config_params["robot_ids"]
@@ -142,7 +142,7 @@ if __name__ == "__main__":
                                                               config_params["with_robots"],
                                                               VERBOSE))
 
-    scheduling_policy = "lexicographical"  # ["lexicographical", "shortest_distance", "uniform_utilisation"]
+    scheduling_policy = "shortest_distance"  # ["lexicographical", "shortest_distance", "uniform_utilisation"]
 
     farm = topological_simpy.farm_sim.FarmSim(config_params["map_name"],
                                               env,

@@ -231,7 +231,11 @@ class RobotSim(Robot):
 
         :param target: string, target node
         """
-        route_nodes = self.get_route_nodes(self.curr_node, target)
+        # get route to the target and avoid nodes occupied by other robots
+        avoid_nodes = self.graph.get_active_nodes([self.robot_id])
+        avoid_nodes = list(dict.fromkeys(avoid_nodes))
+        route_nodes = self.get_route_nodes(self.curr_node, avoid_nodes, target)
+
         interrupted = False
         idx = 0
         change_route = False
