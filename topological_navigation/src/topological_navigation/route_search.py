@@ -8,7 +8,7 @@ from cachier import cachier
 import datetime
 
 
-# @cachier(stale_after=datetime.timedelta(hours=168))
+@cachier(stale_after=datetime.timedelta(hours=168))
 def search_route_func(top_map, origin, target):
     if origin == "none" or target == "none" or origin == target:
         return None
@@ -159,9 +159,9 @@ class TopologicalRouteSearch(object):
         #        rospy.loginfo("Waiting for Topological map ...")
         self.top_map = top_map
 
-        # self.ignore_cache = ignore_cache
-        # if ignore_cache:
-        #     search_route_func.clear_cache()
+        self.ignore_cache = ignore_cache
+        if ignore_cache:
+            search_route_func.clear_cache()
 
     """
      search_route
@@ -170,5 +170,5 @@ class TopologicalRouteSearch(object):
     """
 
     def search_route(self, origin, target):
-        # return search_route_func(self.top_map, origin, target, ignore_cache= self.ignore_cache)
-        return search_route_func(self.top_map, origin, target)
+        return search_route_func(self.top_map, origin, target, ignore_cache= self.ignore_cache)
+        # return search_route_func(self.top_map, origin, target)
