@@ -2,10 +2,10 @@
 ###################################################################################################################
 import sys, json, numpy as np
 import rospy, rostopic, tf
-import strands_navigation_msgs.srv
+import topological_navigation_msgs.srv
 
 from geometry_msgs.msg import Pose
-from std_msgs.msg import String
+from std_msgs.msg import String, Float32
 from topological_navigation_msgs.msg import ClosestEdges
 
 from topological_navigation.tmap_utils import *
@@ -101,6 +101,7 @@ class TopologicalNavLoc(object):
         self.throttle = self.throttle_val
         self.node="Unknown"
         self.wpstr="Unknown"
+        self.closest_dist = 10e5-1
         self.cnstr="Unknown"
         self.closest_edge_ids = []
         self.closest_edge_dists = []
@@ -111,6 +112,7 @@ class TopologicalNavLoc(object):
 
         self.subscribers=[]
         self.wp_pub = rospy.Publisher('closest_node', String, latch=True, queue_size=1)
+        self.wd_pub = rospy.Publisher('closest_node_distance', Float32, latch=True, queue_size=1)
         self.cn_pub = rospy.Publisher('current_node', String, latch=True, queue_size=1)
         self.ce_pub = rospy.Publisher('closest_edges', ClosestEdges, latch=True, queue_size=1)
 
@@ -124,17 +126,15 @@ class TopologicalNavLoc(object):
         self.previous_pose.position.x=1000 #just give a random big value so this is tested
 
         #This service returns a list of nodes that have a given tag
-        self.get_tagged_srv=rospy.Service('topological_localisation/get_nodes_with_tag', strands_navigation_msgs.srv.GetTaggedNodes, self.get_nodes_wtag_cb)
-        self.loc_pos_srv=rospy.Service('topological_localisation/localise_pose', strands_navigation_msgs.srv.LocalisePose, self.localise_pose_cb)
+        self.get_tagged_srv=rospy.Service('topological_localisation/get_nodes_with_tag', topological_navigation_msgs.srv.GetTaggedNodes, self.get_nodes_wtag_cb)
+        self.loc_pos_srv=rospy.Service('topological_localisation/localise_pose', topological_navigation_msgs.srv.LocalisePose, self.localise_pose_cb)
 
         rospy.Subscriber('topological_map_2', String, self.MapCallback)
             
-        rospy.loginfo("Waiting for Topological map ...")
+        rospy.loginfo("Localisation waiting for the Topological Map...")
         while not self.rec_map :
             rospy.sleep(rospy.Duration.from_sec(0.1))
-        
-        rospy.loginfo("NODES BY TOPIC: %s" %self.names_by_topic)
-        rospy.loginfo("NO GO NODES: %s" %self.nogos)
+        rospy.loginfo("Localisation received the Topological Map")
         
         self.base_frame = rospy.get_param("~base_frame", "base_link")
         
@@ -171,7 +171,7 @@ class TopologicalNavLoc(object):
             distances = pnt2line(pnts, self.vectors_start, self.vectors_end)
             closest_edges = [self.dist_edge_ids[index] for index in np.argsort(distances)]
         except Exception as e:
-            rospy.logerr("Error getting distance to edges: {}".format(e))
+            rospy.logwarn("Cannot get distance to edges: {}".format(e))
             closest_edges = []
             distances = np.array([])
         
@@ -191,7 +191,7 @@ class TopologicalNavLoc(object):
                 (trans,rot) = self.listener.lookupTransform(self.tmap_frame, self.base_frame, now)
             except Exception as e:
                 rospy.logerr(e)
-                self.rate.sleep()
+                self._sleep()
                 continue
         
             msg = Pose()
@@ -254,16 +254,25 @@ class TopologicalNavLoc(object):
                             closeststr=str(name)
                             not_loc=False
                         ind+=1
-    
-                self.publishTopics(closeststr, currentstr, closest_edges, list(np.round(edge_dists, 3)))
+                
+                # distance to physically closest node.
+                closest_dist = np.round(self.distances[0]["dist"], 3)
+                self.publishTopics(closeststr, closest_dist, currentstr, closest_edges, list(np.round(edge_dists, 3)))
                 self.throttle=1
             else:
                 self.throttle +=1
                 
+            self._sleep()
+            
+
+    def _sleep(self):
+        try:
             self.rate.sleep()
+        except rospy.ROSInterruptException:
+            pass
+            
 
-
-    def publishTopics(self, wpstr, cnstr, closest_edge_ids, closest_edge_dists) :
+    def publishTopics(self, wpstr, closest_dist, cnstr, closest_edge_ids, closest_edge_dists) :
         
         def pub_closest_edges(closest_edge_ids, closest_edge_dists):
             msg = ClosestEdges()
@@ -277,6 +286,8 @@ class TopologicalNavLoc(object):
         if self.only_latched :
             if self.wpstr != wpstr:
                 self.wp_pub.publish(wpstr)
+            if self.closest_dist != closest_dist:
+                self.wd_pub.publish(closest_dist)
             if self.cnstr != cnstr:
                 self.cn_pub.publish(cnstr)
             if self.closest_edge_ids != closest_edge_ids \
@@ -284,11 +295,13 @@ class TopologicalNavLoc(object):
                 pub_closest_edges(closest_edge_ids, closest_edge_dists)
         else:
             self.wp_pub.publish(wpstr)
+            self.wd_pub.publish(closest_dist)
             self.cn_pub.publish(cnstr)
             pub_closest_edges(closest_edge_ids, closest_edge_dists)
             
-        self.wpstr=wpstr
-        self.cnstr=cnstr
+        self.wpstr = wpstr
+        self.closest_dist = closest_dist
+        self.cnstr = cnstr
         self.closest_edge_ids = closest_edge_ids
         self.closest_edge_dists = closest_edge_dists
         
@@ -306,13 +319,14 @@ class TopologicalNavLoc(object):
         
         self.get_edge_vectors()
         self.update_loc_by_topic()
+        
         # TODO: remove Temporary arg until tags functionality is MongoDB independent
         if self.with_tags:
             self.nogos = self.get_no_go_nodes()
         else:
             self.nogos=[]
 
-        rospy.loginfo("Subscribing to localise topics")
+        rospy.loginfo("Creating localise by topic subscribers...")
 
         for i in self.subscribers:
             del i
@@ -326,7 +340,9 @@ class TopologicalNavLoc(object):
             ))
             # Calling instance of class to start subsribing thread.
             self.subscribers[-1]()
-            
+        
+        rospy.loginfo("NODES BY TOPIC: %s" %self.names_by_topic)
+        rospy.loginfo("NO GO NODES: %s" %self.nogos)
         self.rec_map = True
             
             
@@ -336,29 +352,25 @@ class TopologicalNavLoc(object):
         for node in self.tmap["nodes"]:
             node_poses[node["node"]["name"]] = node["node"]["pose"]
         
-        bad_edges = []
-        for node in self.tmap["nodes"]:
-            for edge in node["node"]["edges"]:
-                if node["node"]["pose"] == node_poses[edge["node"]]:
-                    rospy.logerr("Cannot get distance to edge {}: Destination is equal to origin".format(edge["edge_id"]))
-                    bad_edges.append(edge["edge_id"])
-            
         self.dist_edge_ids = []
         vectors_start = []
         vectors_end = []
         
         for node in self.tmap["nodes"]:
-            start = [node["node"]["pose"]["position"]["x"], node["node"]["pose"]["position"]["y"], 0]
+            orig_pose = node_poses[node["node"]["name"]]
+            start = [orig_pose["position"]["x"], orig_pose["position"]["y"], 0]
             
             for edge in node["node"]["edges"]:
-                if edge["edge_id"] not in bad_edges:
+                dest_pose = node_poses[edge["node"]]
+                
+                if orig_pose != dest_pose:
                     self.dist_edge_ids.append(edge["edge_id"])
-                    
-                    dest_pose = node_poses[edge["node"]]
                     end = [dest_pose["position"]["x"], dest_pose["position"]["y"], 0]
                     
                     vectors_start.append(start)
                     vectors_end.append(end)
+                else:
+                    rospy.logerr("Cannot get distance to edge {}: Destination is equal to origin".format(edge["edge_id"]))
         
         self.vectors_start = np.array(vectors_start)
         self.vectors_end = np.array(vectors_end)
@@ -378,7 +390,6 @@ class TopologicalNavLoc(object):
                     a['persistency']=10
                 self.nodes_by_topic.append(a)
                 self.names_by_topic.append(a['name'])
-        print self.nodes_by_topic
 
 
     def Callback(self, msg, item):
@@ -419,7 +430,7 @@ class TopologicalNavLoc(object):
 
         try:
             rospy.wait_for_service('/topological_map_manager2/get_tagged_nodes', timeout=3)
-            cont = rospy.ServiceProxy('/topological_map_manager2/get_tagged_nodes', strands_navigation_msgs.srv.GetTaggedNodes)
+            cont = rospy.ServiceProxy('/topological_map_manager2/get_tagged_nodes', topological_navigation_msgs.srv.GetTaggedNodes)
                 
             resp1 = cont(req.tag)
             tagnodes = resp1.nodes
@@ -472,7 +483,7 @@ class TopologicalNavLoc(object):
         """
         try:
             rospy.wait_for_service('/topological_map_manager2/get_tagged_nodes', timeout=3)
-            get_prediction = rospy.ServiceProxy('/topological_map_manager2/get_tagged_nodes', strands_navigation_msgs.srv.GetTaggedNodes)
+            get_prediction = rospy.ServiceProxy('/topological_map_manager2/get_tagged_nodes', topological_navigation_msgs.srv.GetTaggedNodes)
                 
             resp1 = get_prediction('no_go')
             return resp1.nodes

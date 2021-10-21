@@ -24,14 +24,6 @@ def pnt2line(pnt, start, end):
     return distance(nearest, pnt_vec)
 
 
-def dot(v, w):
-    return v[0]*w[0] + v[1]*w[1] + v[2]*w[2]
-
-
-def length(v):
-    return np.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
-
-
 def vector(b, e):
     return b[0]-e[0], b[1]-e[1], b[2]-e[2]
 
@@ -41,12 +33,20 @@ def unit(v):
     return v[0]/mag, v[1]/mag, v[2]/mag
 
 
-def distance(p0, p1):
-    return length(vector(p0, p1))
+def length(v):
+    return np.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
 
 
 def scale(v, sc):
     return v[0]*sc, v[1]*sc, v[2]*sc
+
+
+def dot(v, w):
+    return v[0]*w[0] + v[1]*w[1] + v[2]*w[2]
+
+
+def distance(p0, p1):
+    return length(vector(p0, p1))
 ###################################################################################################################
 
 
@@ -56,14 +56,16 @@ def scale(v, sc):
 #          [..., ..., ...],
 #          [xn, yn, zn]]    
 
-pnt = np.array([[5, 4, 0],
-                [5, 4, 0]])
+if __name__ == '__main__':
     
-start = np.array([[3, 0, 0],
-                  [2, 3, 0]])
-    
-end =   np.array([[8, 5, 0],
-                  [4, 7, 0]])
-    
-print(pnt2line(pnt, start, end))
+    pnt = np.array([[5, 4, 0],
+                    [5, 4, 0]])
+        
+    start = np.array([[3, 0, 0],
+                      [2, 3, 0]])
+        
+    end =   np.array([[8, 5, 0],
+                      [4, 7, 0]])
+        
+    print(pnt2line(pnt, start, end))
 ###################################################################################################################

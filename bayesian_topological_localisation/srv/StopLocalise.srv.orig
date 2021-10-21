@@ -1,0 +1,9 @@
+string name
+
+---
+
+<<<<<<< HEAD
+bool success
+=======
+bool success
+>>>>>>> e02b9fb3f5f2be71b6f1991e79361fe35abb95a4

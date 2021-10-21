@@ -6,15 +6,13 @@ Created on Wed Feb 10 15:58:34 2021
 """
 #############################################################################################################
 import rospy, dynamic_reconfigure.client
-from strands_navigation_msgs.srv import ReconfAtEdges
+from topological_navigation_msgs.srv import ReconfAtEdges
 
 
 class EdgeReconfigureManager(object):
     
     
     def __init__(self):
-        
-        rospy.logwarn("Edge Reconfigure Manager: USING EDGE RECONFIGURE ...")
         
         self.active = False
         

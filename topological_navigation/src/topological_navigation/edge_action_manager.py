@@ -6,7 +6,7 @@ Created on Tue Apr 13 22:02:24 2021
 """
 #########################################################################################################
 import rospy, actionlib
-import operator, collections, json
+import operator, collections
 
 from functools import reduce  # forward compatibility for Python 3
 from rospy_message_converter import message_converter
@@ -57,14 +57,15 @@ class EdgeActionManager(object):
     def __init__(self):
         
         self.client = None        
-        self.current_action = None
+        self.current_action = "none"
         self.dt = dict_tools()
         
     
-    def initialise(self, edge, destination_node):
+    def initialise(self, edge, destination_node, origin_node=None):
         
-        self.edge = eval(json.dumps(edge)) # remove unicode prefix notation u
-        self.destination_node = eval(json.dumps(destination_node))
+        self.edge = edge
+        self.destination_node = destination_node
+        self.origin_node = origin_node
         
         rospy.loginfo("Edge Action Manager: Processing edge {}".format(self.edge["edge_id"]))
         
@@ -78,7 +79,7 @@ class EdgeActionManager(object):
         action_spec = items[1][:-4] + "Action"
         
         rospy.loginfo("Edge Action Manager: Importing {} from {}.msg".format(action_spec, package))
-        action = _import(package + ".msg", action_spec)
+        action = _import(package+".msg", action_spec)
         
         rospy.loginfo("Edge Action Manager: Creating a {} client".format(self.action_name.upper()))
         self.client = actionlib.SimpleActionClient(self.action_name, action)        
@@ -103,17 +104,22 @@ class EdgeActionManager(object):
         for item in paths:
             value = item["value"]
             
-            if isinstance(value, str) and value.startswith("$"):
-                _property = self.dt.getFromDict(self.destination_node, value[1:].split("."))
-                goal_args = self.dt.setInDict(goal_args, item["keys"], _property)
+            if isinstance(value, str):
+                
+                if value.startswith("$"):
+                    _property = self.dt.getFromDict(self.destination_node, value[1:].split("."))
+                    goal_args = self.dt.setInDict(goal_args, item["keys"], _property)
+                    
+                elif value.startswith("+") and self.origin_node is not None:
+                    _property = self.dt.getFromDict(self.origin_node, value[1:].split("."))
+                    goal_args = self.dt.setInDict(goal_args, item["keys"], _property)
 
         self.goal = message_converter.convert_dictionary_to_ros_message(action_type, goal_args)
         
  
     def execute(self):
         
-        rospy.loginfo("Edge Action Manager: Executing the action")
+        rospy.loginfo("Edge Action Manager: Executing the action...")
         self.client.send_goal(self.goal)
         self.current_action = self.action_name
-        rospy.loginfo("Edge Action Manager: Waiting for the result ...")
 #########################################################################################################
