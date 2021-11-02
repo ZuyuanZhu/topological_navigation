@@ -520,7 +520,7 @@ if __name__ == "__main__":
     tmap_config_file = '../maps/clockhouse_transportation_rowtagged.tmap2'
 
     # parameters for running the simulation
-    n_trials = 10
+    n_trials = 1
     min_n_pickers = 2
     max_n_pickers = 3
     min_n_robots = 2
