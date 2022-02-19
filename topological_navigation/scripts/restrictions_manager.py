@@ -14,7 +14,7 @@ from topological_navigation_msgs.msg import TopologicalMap
 from topological_navigation_msgs.srv import GetTaggedNodes, GetTaggedNodesRequest
 from std_msgs.msg import String
 from sympy.parsing.sympy_parser import parse_expr
-from restrictions_impl import *
+from topological_navigation.restrictions_impl import *
 
 
 class RestrictionsManager():
@@ -52,10 +52,10 @@ class RestrictionsManager():
     def register_connections(self):
         rospy.Subscriber("/topological_map_2",
                          String, self._topomap_cb)
-        rospy.loginfo("Waiting for topological map...")
+        rospy.loginfo("Restrictions manager waiting for the Topological Map...")
         while self.topo_map is None:
             rospy.sleep(0.5)
-        rospy.loginfo("DONE")
+        rospy.loginfo("Restrictions manager received the Topological Map")
 
         rospy.Service("restrictions_manager/restrict_planning_map",
                       RestrictMap, self.restrict_planning_map_handle)
