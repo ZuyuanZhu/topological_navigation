@@ -5,8 +5,8 @@ Created on Tue Apr 13 22:02:24 2021
 
 """
 #########################################################################################################
-import rospy, actionlib
-import operator, collections
+import rospy, actionlib, json, yaml
+import operator, collections, copy
 
 from functools import reduce  # forward compatibility for Python 3
 from rospy_message_converter import message_converter
@@ -31,7 +31,7 @@ class dict_tools(object):
         Recursively loops through a nested dictionary. 
         For each inner-most value generates the list of keys needed to access it.
         """
-        for key, value in nested.iteritems():
+        for key, value in nested.items():
             path = "{},{}".format(prefix, key)
             if isinstance(value, collections.Mapping):
                 for inner_key, inner_value in self.nested_dict_iter(value, path):
@@ -63,7 +63,7 @@ class EdgeActionManager(object):
     
     def initialise(self, edge, destination_node, origin_node=None):
         
-        self.edge = edge
+        self.edge = yaml.safe_load(json.dumps(edge)) # no unicode in edge
         self.destination_node = destination_node
         self.origin_node = origin_node
         
@@ -86,7 +86,7 @@ class EdgeActionManager(object):
         self.client.wait_for_server()
         
         rospy.loginfo("Edge Action Manager: Constructing the goal")
-        self.construct_goal(action_type, self.edge["goal"])
+        self.construct_goal(action_type, copy.deepcopy(self.edge["goal"]))
         
         
     def preempt(self):

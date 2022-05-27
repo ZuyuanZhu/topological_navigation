@@ -134,7 +134,6 @@ class TopologicalNavLoc(object):
         rospy.loginfo("Localisation waiting for the Topological Map...")
         while not self.rec_map :
             rospy.sleep(rospy.Duration.from_sec(0.1))
-        rospy.loginfo("Localisation received the Topological Map")
         
         self.base_frame = rospy.get_param("~base_frame", "base_link")
         
@@ -316,6 +315,7 @@ class TopologicalNavLoc(object):
 
         self.tmap = json.loads(msg.data) 
         self.tmap_frame = self.tmap["transformation"]["child"]
+        rospy.loginfo("Localisation received the Topological Map")
         
         self.get_edge_vectors()
         self.update_loc_by_topic()
@@ -363,7 +363,7 @@ class TopologicalNavLoc(object):
             for edge in node["node"]["edges"]:
                 dest_pose = node_poses[edge["node"]]
                 
-                if orig_pose != dest_pose:
+                if node["node"]["name"] != edge["node"]:
                     self.dist_edge_ids.append(edge["edge_id"])
                     end = [dest_pose["position"]["x"], dest_pose["position"]["y"], 0]
                     
@@ -435,7 +435,7 @@ class TopologicalNavLoc(object):
             resp1 = cont(req.tag)
             tagnodes = resp1.nodes
             
-        except rospy.ServiceException, e:
+        except (rospy.ServiceException) as e:
             rospy.logerr("Service call failed: %s"%e)
 
         ldis = [x["node"]["node"]["name"] for x in self.distances]
@@ -488,7 +488,7 @@ class TopologicalNavLoc(object):
             resp1 = get_prediction('no_go')
             return resp1.nodes
         
-        except rospy.ServiceException, e:
+        except rospy.ServiceException as e:
             rospy.logerr("Service call failed: %s"%e)
 
 
